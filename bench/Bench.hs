@@ -5,14 +5,16 @@ import Criterion.Main (Benchmark, bench, defaultMain, nfIO, bgroup)
 import Database.HDBC
 import Database.HDBC.ODBC
 
-import Control.Monad (forM)
+import Control.Monad (forM, mapM)
 
 main :: IO ()
 main = do
   -- requires entry in odbc.ini with name "HDBC-test"
   conn <- connectODBC "DSN=HDBC-test"
   setupInsert conn
-  defaultMain [benchInsert conn 1000]
+  defaultMain 
+    [ benchInsertExecute conn 1000
+    , benchInsertExecuteMany conn 1000]
   teardownInsert conn
   disconnect conn
 
@@ -26,17 +28,24 @@ setupInsert conn = do
     "CREATE TABLE testInsert (char CHAR(10), int INTEGER, float FLOAT)" []
   commit conn
 
-benchInsert :: IConnection conn => conn -> Int -> Benchmark
-
-benchInsert :: IConnection conn => conn -> Int -> IO ()
-benchInsert conn n = bench "Insert" $ nfIO $ do
+benchInsertExecute :: IConnection conn => conn -> Int -> Benchmark
+benchInsertExecute conn n = bench "InsertExecute" $ nfIO $ do
   stmt <- prepare conn "INSERT INTO testInsert VALUES (?, ?, ?)"
   forM [1 .. n] $ \x ->
-    execute stmt
-      [ SqlString (show x)
-      , SqlInt32 (fromIntegral x)
-      , SqlDouble (fromIntegral x)
-      ]
+    execute stmt $ toTestInsert x
+  commit conn
+
+toTestInsert :: Int -> [SqlValue]
+toTestInsert x = 
+  [ SqlString (show x)
+  , SqlInt32 (fromIntegral x)
+  , SqlDouble (fromIntegral x)
+  ]
+
+benchInsertExecuteMany :: IConnection conn => conn -> Int -> Benchmark
+benchInsertExecuteMany conn n = bench "InsertExecuteMany" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testInsert VALUES(?, ?, ?)"
+  executeMany stmt $ map toTestInsert [1 .. n]
   commit conn
 
 teardownInsert :: IConnection conn => conn -> IO()

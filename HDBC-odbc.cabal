@@ -74,14 +74,38 @@ Executable runtests
     Testbasics,
     Tests
   Hs-Source-Dirs: ., testsrc
-  C-Sources: hdbc-odbc-helper.c
   if os(mingw32) || os(win32)
     Extra-Libraries: odbc32
   else
     Extra-Libraries: odbc
   include-dirs: .
+  C-Sources: hdbc-odbc-helper.c
   GHC-Options: -O2
   Extensions: 
     ExistentialQuantification,
     ForeignFunctionInterface,
     PatternSignatures
+
+benchmark hdbc-bench
+  type:     		exitcode-stdio-1.0
+  hs-source-dirs: 	Database, bench, .
+  main-is: 		Bench.hs
+  other-modules: 	Database.HDBC.ODBC,
+    Database.HDBC.ODBC.Connection,
+    Database.HDBC.ODBC.Statement,
+    Database.HDBC.ODBC.Types,
+    Database.HDBC.ODBC.Utils,
+    Database.HDBC.ODBC.TypeConv,
+    Database.HDBC.ODBC.ConnectionImpl
+  build-depends: 	base, criterion
+  C-Sources: 		hdbc-odbc-helper.c
+  if os(mingw32) || os(win32)
+    Extra-Libraries: odbc32
+  else
+    Extra-Libraries: odbc
+  ghc-options: 		-O2
+  Extensions: 
+    ExistentialQuantification,
+    ForeignFunctionInterface,
+    PatternSignatures
+  include-dirs: 	.

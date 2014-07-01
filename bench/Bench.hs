@@ -14,7 +14,8 @@ main = do
   setupInsert conn
   defaultMain 
     [ benchInsertExecute conn 1000
-    , benchInsertExecuteMany conn 1000]
+    , benchInsertExecuteMany conn 1000
+    , benchInsertExecute conn 1000 ]
   teardownInsert conn
   disconnect conn
 
@@ -31,8 +32,7 @@ setupInsert conn = do
 benchInsertExecute :: IConnection conn => conn -> Int -> Benchmark
 benchInsertExecute conn n = bench "InsertExecute" $ nfIO $ do
   stmt <- prepare conn "INSERT INTO testInsert VALUES (?, ?, ?)"
-  forM [1 .. n] $ \x ->
-    execute stmt $ toTestInsert x
+  mapM_ (execute stmt) $ map toTestInsert [1 .. n]
   commit conn
 
 toTestInsert :: Int -> [SqlValue]

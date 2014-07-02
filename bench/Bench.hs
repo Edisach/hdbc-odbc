@@ -92,7 +92,7 @@ benchSelectExecute conn n = bench "SelectExecute" $ nfIO $ do
 
 teardownSelect :: IConnection conn => conn -> IO()
 teardownSelect conn = do
-  run conn "DROP TABLE selectInsert" []
+  run conn "DROP TABLE testSelect" []
   commit conn
 
 

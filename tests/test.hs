@@ -30,10 +30,7 @@ dropTable = dbTest $ (\dbh ->
          commit dbh
          )
 
-definiteFail = assertEqual "much fail" 1 2 
-
 hTests = testGroup "HUnit Tests" 
          [ testCase "Create table" createTable
          , testCase "Drop table" dropTable
-         , testCase "Fail" definiteFail
          ]

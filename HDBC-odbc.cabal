@@ -20,10 +20,6 @@ Description: This package provides an ODBC database backend for HDBC.
  MySQL databases from Haskell.
 Stability: Beta
 
-Flag buildtests
-  description: Build the executable to run unit tests
-  default: False
-
 Library
   Exposed-Modules: Database.HDBC.ODBC
   Other-Modules: Database.HDBC.ODBC.Connection,
@@ -50,6 +46,9 @@ Library
     Extra-Libraries: odbc
   include-dirs: .
   -- extra-lib-dirs: 
+
+flag buildtests
+  Default: False
 
 Executable runtests
   if flag(buildtests)
@@ -85,3 +84,39 @@ Executable runtests
     ExistentialQuantification,
     ForeignFunctionInterface,
     PatternSignatures
+
+Test-suite test
+  Type:
+    exitcode-stdio-1.0
+  Hs-source-dirs:
+    tests, Database, .
+  Main-is:
+    test.hs
+  Build-depends: base >= 4.3.1.0 && < 5
+               , tasty >= 0.7 
+               , mtl
+               , HDBC>=2.1.0
+               , time>=1.2.0.3
+               , utf8-string
+               , bytestring   
+               , tasty-hunit
+               , tasty-quickcheck
+               , tasty-smallcheck
+  Other-Modules: Database.HDBC.ODBC,
+    Database.HDBC.ODBC.Connection,
+    Database.HDBC.ODBC.Statement,
+    Database.HDBC.ODBC.Types,
+    Database.HDBC.ODBC.Utils,
+    Database.HDBC.ODBC.TypeConv,
+    Database.HDBC.ODBC.ConnectionImpl
+  Extensions: 
+    ExistentialQuantification,
+    ForeignFunctionInterface,
+    ScopedTypeVariables
+  GHC-Options: -O2
+  C-Sources: hdbc-odbc-helper.c
+  if os(mingw32) || os(win32)
+    Extra-Libraries: odbc32
+  else
+    Extra-Libraries: odbc
+  include-dirs: .

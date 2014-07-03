@@ -1,2 +1,7 @@
 dist*
 **.swp
+.cabal-sandbox/
+**~
+cabal.sandbox.config
+report.csv
+report.html

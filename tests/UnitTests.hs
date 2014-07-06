@@ -1,8 +1,9 @@
-module UnitTests where
+module UnitTests(hTests) where
 
 import Test.Tasty
 import Test.Tasty.HUnit
 import Control.Exception
+import qualified Data.Map as Map
 
 import Database.HDBC
 import Database.HDBC.ODBC
@@ -57,6 +58,7 @@ createTable = dbTest $ (\dbh ->
 
 dropTable = dbTest $ (\dbh ->
       do run dbh "DROP TABLE test1" []
+         run dbh "DROP TABLE test2" []
          commit dbh
          )
 
@@ -206,6 +208,133 @@ testSRun = dbTest $ (\dbh ->
          assertEqual "null" [[SqlNull]] yss
          )
 
+testOriginalQuery = dbTest $ (\dbh ->
+      do sth <- prepare dbh "SELECT ?"
+         assertEqual "equality" (originalQuery sth) "SELECT ?"
+         )
+
+rawRowData = ["fetch", "1"]
+rowdata = map toSql rawRowData
+cols = ["name", "value"]
+alRows = zip cols rowdata
+mapRows = Map.fromList alRows
+justRows = map (\x -> Just x) rawRowData
+
+setupFetch = dbTest $ (\dbh -> 
+      do run dbh "DROP TABLE IF EXISTS test2" []
+         commit dbh
+         run dbh "CREATE TABLE test2 (name VARCHAR(10), value VARCHAR(20))" []
+         commit dbh
+         run dbh "INSERT INTO test2 VALUES (?, ?)" rowdata
+         commit dbh
+         )
+
+testFetchRow = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchRow qry >>= assertEqual "one row" (Just rowdata)
+         fetchRow qry >>= assertEqual "no more rows" (Nothing)
+         )
+
+testFetchRowAL = dbTest $ (\dbh ->
+      do run dbh "INSERT INTO test1 VALUES ('fetchRowAL', 1)" []
+         commit dbh
+         qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchRowAL qry >>= assertEqual "one row" (Just alRows)
+         fetchRowAL qry >>= assertEqual "no more row" Nothing
+         )
+
+testFetchRowMap = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchRowMap qry >>= assertEqual "one row" (Just mapRows)
+         fetchRowMap qry >>= assertEqual "no more rows" Nothing
+         )
+
+testSFetchRow = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         sFetchRow qry >>= assertEqual "one row" (Just justRows)
+         sFetchRow qry >>= assertEqual "no more rows" Nothing
+         )
+
+testFetchAllRows = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchAllRows qry >>= assertEqual "one row" [rowdata]
+         )
+
+testFetchAllRows' = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchAllRows' qry >>= assertEqual "one row" [rowdata]
+         )
+
+testFetchAllRowsAL = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchAllRowsAL qry >>= assertEqual "one row" [alRows]
+         )
+
+testFetchAllRowsAL' = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchAllRowsAL' qry >>= assertEqual "one row" [alRows]
+         )
+
+testFetchAllRowsMap = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchAllRowsMap qry >>= assertEqual "one row" [mapRows]
+         )
+
+testFetchAllRowsMap' = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         fetchAllRowsMap' qry >>= assertEqual "one row" [mapRows]
+         )
+
+testSFetchAllRows = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh 
+         sFetchAllRows qry >>= assertEqual "one row" [justRows]
+         )
+
+testSFetchAllRows' = dbTest $ (\dbh ->
+      do qry <- prepare dbh "SELECT * FROM test2"
+         execute qry []
+         commit dbh
+         sFetchAllRows' qry >>= assertEqual "one row" [justRows]
+         )
+
+fetchTests = testGroup "Fetch tests" 
+         [ testCase "setup fetch" setupFetch
+         , testCase "fetchRow" testFetchRow
+         , testCase "fetchRowAL" testFetchRowAL
+         , testCase "fetchRowMap" testFetchRowMap 
+         , testCase "sFetchRow" testSFetchRow
+         , testCase "fetchAllRows" testFetchAllRows
+         , testCase "fetchAllRows'" testFetchAllRows'
+         , testCase "fetchAllRowsAL" testFetchAllRowsAL
+         , testCase "fetchAllRowsAL'" testFetchAllRowsAL'
+         , testCase "fetchAllRowsMap" testFetchAllRowsMap
+         , testCase "fetchAllRowsMap'" testFetchAllRowsMap'
+         , testCase "sFetchAllRows" testSFetchAllRows
+         , testCase "sFetchAllRows'" testSFetchAllRows'
+         ]
+
 hTests = testGroup "HUnit Tests" 
          --[ testCase "Print info" dbInfo
          [ testCase "Open and close DB" openCloseDB
@@ -227,5 +356,7 @@ hTests = testGroup "HUnit Tests"
          , testCase "getTables" testGetTables
          , testCase "describeTable" testDescribeTable
          , testCase "sRun" testSRun
+         , testCase "originalQuery" testOriginalQuery
+         , fetchTests
          --, testCase "Drop table" dropTable
          ]

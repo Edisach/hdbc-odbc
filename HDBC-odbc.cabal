@@ -102,6 +102,7 @@ Test-suite test
                , tasty-hunit
                , tasty-quickcheck
                , tasty-smallcheck
+               , containers
   Other-Modules: Database.HDBC.ODBC,
     Database.HDBC.ODBC.Connection,
     Database.HDBC.ODBC.Statement,

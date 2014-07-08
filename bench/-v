@@ -1,0 +1,18 @@
+module Basic where 
+
+import Criterion.Main (Benchmark, bench, nfIO, bgroup)
+import Database.HDBC
+import Control.Monad (forM, mapM, mapM_)
+
+-- The benchmark group
+benchBasic conn = bgroup "Basic"
+              [ benchSelectExecute conn]
+
+-- Utilities
+
+-- Benchmarks
+benchSelectExecute :: IConnection conn => conn -> Benchmark
+benchSelectExecute conn = bench "SelectExecute" $ nfIO $ do
+  stmt <- prepare conn "SELECT 1"
+  execute stmt []
+  commit conn

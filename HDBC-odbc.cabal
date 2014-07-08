@@ -140,6 +140,6 @@ benchmark hdbc-bench
   Extensions: 
     ExistentialQuantification,
     ForeignFunctionInterface,
-    PatternSignatures
+    ScopedTypeVariables
   include-dirs: 	.
 >>>>>>> create benchmarking

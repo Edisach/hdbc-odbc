@@ -1,3 +1,4 @@
+**~
 dist*
 **.swp
 .cabal-sandbox/
@@ -8,4 +9,3 @@ report.html
 *.swp
 .cabal-sandbox/
 cabal.sandbox.config
->>>>>>> update .gitignore for cabal sandbox

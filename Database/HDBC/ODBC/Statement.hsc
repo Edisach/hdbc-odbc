@@ -41,7 +41,7 @@ import Debug.Trace
 
 l :: String -> IO ()
 l _ = return ()
--- l m = hPutStrLn stderr ("\n" ++ m)
+--l m = hPutStrLn stderr ("\n" ++ m)
 
 #ifdef mingw32_HOST_OS
 #include <windows.h>

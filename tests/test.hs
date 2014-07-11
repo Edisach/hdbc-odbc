@@ -8,5 +8,5 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Tests" 
-        [hTests, sTests{-, qTests-}]
+        [hTests{-, sTests, qTests-}]
 

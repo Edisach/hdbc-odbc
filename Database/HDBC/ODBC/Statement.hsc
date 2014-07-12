@@ -3,16 +3,16 @@
 -- Above line for hugs
 {-# LANGUAGE EmptyDataDecls #-}
 
-module Database.HDBC.ODBC.Statement (
+module Database.HDBC.ODBC.Statement 
+#ifndef TEST
+(
    fGetQueryInfo,
-#ifdef TEST
-   SState(..),
-   newSState,
-#endif
    newSth,
    fgettables,
    fdescribetable
- ) where
+ ) 
+#endif 
+   where
 
 import Database.HDBC.Types
 import Database.HDBC
@@ -234,12 +234,6 @@ getNumResultCols sthptr = alloca $ \pcount ->
        peek pcount
 
 -- Bind a parameter column before execution.
-bindParam :: Ptr CStmt -> SqlValue -> Word16
-        -> IO (Maybe (Ptr #{type SQLLEN}, Ptr CChar))
-bindParam sthptr arg icol =  alloca $ \pdtype ->
-                           alloca $ \pcolsize ->
-                           alloca $ \pdecdigits ->
-                           alloca $ \pnullable ->
 {- We have to start by getting the SQL type of the column so we can
    send the correct type back to the server.  Sigh.  If the ODBC
    backend won't tell us the type, we fake it.
@@ -249,6 +243,12 @@ bindParam sthptr arg icol =  alloca $ \pdtype ->
    it and the caller never gets to freed the allocated data to-date.
    So, make sure we either free of have foreignized everything before
    control passes out of this function. -}
+bindParam :: Ptr CStmt -> SqlValue -> Word16
+        -> IO (Maybe (Ptr #{type SQLLEN}, Ptr CChar))
+bindParam sthptr arg icol =  alloca $ \pdtype ->
+                           alloca $ \pcolsize ->
+                           alloca $ \pdecdigits ->
+                           alloca $ \pnullable ->
 
     do l $ "Binding col " ++ show icol ++ ": " ++ show arg
        rc1 <- sqlDescribeParam sthptr icol pdtype pcolsize pdecdigits pnullable

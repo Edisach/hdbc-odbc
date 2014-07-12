@@ -6,6 +6,7 @@
 module Database.HDBC.ODBC.Statement (
    fGetQueryInfo,
 #ifdef TEST
+   SState(..),
    newSState,
 #endif
    newSth,

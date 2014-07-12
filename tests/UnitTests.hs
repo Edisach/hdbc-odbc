@@ -219,7 +219,10 @@ testOriginalQuery = dbTest $ (\dbh ->
 testNewSState = dbTest $ \dbh -> 
   do iconn <- getIconn dbh
      state1 <- newSState iconn "SELECT 1"
-     state2 <- newSState iconn "SELECT 2"
+     state2 <- newSState iconn "SELECT 1"
+     state3 <- newSState iconn "SELECT 2"
+     assertEqual "Equality" (squery state1) (squery state2)
+     assertBool "Inequality" (squery state2 /= squery state3)
      return ()
 
 rawRowData = ["fetch", "1"]
@@ -367,5 +370,6 @@ hTests = testGroup "HUnit Tests"
          , testCase "sRun" testSRun
          , testCase "originalQuery" testOriginalQuery
          , fetchTests
+         , testCase "newSState" testNewSState
          --, testCase "Drop table" dropTable
          ]

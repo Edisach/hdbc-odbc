@@ -5,6 +5,9 @@
 
 module Database.HDBC.ODBC.Statement (
    fGetQueryInfo,
+#ifdef TEST
+   newSState,
+#endif
    newSth,
    fgettables,
    fdescribetable

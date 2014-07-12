@@ -7,6 +7,9 @@ import qualified Data.Map as Map
 
 import Database.HDBC
 import Database.HDBC.ODBC
+import Database.HDBC.ODBC.Statement
+import Database.HDBC.ODBC.Connection
+import Database.HDBC.ODBC.ConnectionImpl(Connection(getIconn))
 
 import Utils
 
@@ -212,6 +215,12 @@ testOriginalQuery = dbTest $ (\dbh ->
       do sth <- prepare dbh "SELECT ?"
          assertEqual "equality" (originalQuery sth) "SELECT ?"
          )
+
+testNewSState = dbTest $ \dbh -> 
+  do iconn <- getIconn dbh
+     state1 <- newSState iconn "SELECT 1"
+     state2 <- newSState iconn "SELECT 2"
+     return ()
 
 rawRowData = ["fetch", "1"]
 rowdata = map toSql rawRowData

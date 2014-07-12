@@ -1,6 +1,7 @@
 -- -*- mode: haskell; -*-
 {-# CFILES hdbc-odbc-helper.c #-}
 -- Above line for hugs
+{-# LANGUAGE CPP #-}
 
 module Database.HDBC.ODBC.Connection (connectODBC, Impl.Connection) where
 
@@ -142,6 +143,9 @@ mkConn args iconn = withConn iconn $ \cconn ->
          )
        return $ Impl.Connection {
                             Impl.getQueryInfo = fGetQueryInfo iconn children,
+#ifdef TEST
+                            Impl.getIconn = return iconn,
+#endif
                             Impl.disconnect = fdisconnect iconn children,
                             Impl.commit = fcommit iconn,
                             Impl.rollback = frollback iconn,

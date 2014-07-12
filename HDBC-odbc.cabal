@@ -116,6 +116,7 @@ Test-suite test
     ScopedTypeVariables
   GHC-Options: -O2
   C-Sources: hdbc-odbc-helper.c
+  cpp-options: -DTEST
   if os(mingw32) || os(win32)
     Extra-Libraries: odbc32
   else

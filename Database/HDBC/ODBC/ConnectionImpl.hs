@@ -1,12 +1,21 @@
+{-# LANGUAGE CPP #-}
+
 module Database.HDBC.ODBC.ConnectionImpl where
 
 import qualified Database.HDBC.Statement as Types
 import qualified Database.HDBC.Types as Types
 import Database.HDBC.ColTypes as ColTypes
 
+#ifdef TEST
+import qualified Database.HDBC.ODBC.Types as OTypes
+#endif
+
 data Connection = 
     Connection {
                 getQueryInfo :: String -> IO ([SqlColDesc], [(String, SqlColDesc)]),
+#ifdef TEST
+                getIconn :: IO OTypes.Conn,
+#endif
                 disconnect :: IO (),
                 commit :: IO (),
                 rollback :: IO (),

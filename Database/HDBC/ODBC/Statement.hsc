@@ -90,7 +90,7 @@ fakeExecute' sstate  = withConn (dbo sstate) $ \cconn ->
        colInfo <- fgetcolinfo sthptr
        return (parmInfo, colInfo)
 
--- | The Stament State
+-- | The Statement State
 data SState = SState
   { stomv      :: MVar (Maybe Stmt)
   , dbo        :: Conn

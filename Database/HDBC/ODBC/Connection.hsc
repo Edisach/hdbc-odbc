@@ -145,7 +145,8 @@ mkConn args iconn = withConn iconn $ \cconn ->
                             Impl.disconnect = fdisconnect iconn children,
                             Impl.commit = fcommit iconn,
                             Impl.rollback = frollback iconn,
-                            Impl.run = frun iconn children,
+                            --Impl.run = frun iconn children,
+                            Impl.run = fexecdirect iconn,
                             Impl.prepare = newSth iconn children,
                             Impl.clone = connectODBC args,
                             -- FIXME: add clone

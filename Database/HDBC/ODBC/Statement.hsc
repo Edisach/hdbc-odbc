@@ -7,6 +7,7 @@ module Database.HDBC.ODBC.Statement (
    fGetQueryInfo,
    newSth,
    fgettables,
+   fexecdirect,
    fdescribetable
  ) where
 
@@ -221,6 +222,38 @@ fexecute sstate args =
          colcount -> do fgetcolinfo sthptr >>= swapMVar (colinfomv sstate)
                         swapMVar (stomv sstate) (Just fsthptr)
                         touchForeignPtr fsthptr
+                        return 0
+
+fexecdirect :: Conn -> String -> [SqlValue] -> IO Integer
+fexecdirect conn stmt args =
+  withConn conn $ \cconn ->
+  B.useAsCStringLen (BUTF8.fromString stmt) $ \(cquery, cqlen) ->
+  alloca $ \(psthptr::Ptr (Ptr CStmt)) ->
+    do l $ "in fexecdirect: " ++ show stmt ++ show args
+       rc <- sqlAllocStmtHandle #{const SQL_HANDLE_STMT} cconn psthptr
+       sthptr <- peek psthptr
+       wrapsthptr <- withRawConn conn (\rawconn -> wrapstmt sthptr rawconn)
+       fsthptr <- newForeignPtr sqlFreeHandleSth_ptr wrapsthptr
+       checkError "execDirect allocHandle" (DbcHandle cconn) rc
+
+       bindArgs <- zipWithM (bindParam sthptr) args [1..]
+       l $ "Ready for sqlExecDirect" 
+       r <- sqlExecDirect sthptr cquery (fromIntegral cqlen)
+
+       mapM_ (\(x,y) -> free x >> free y) (catMaybes bindArgs)
+
+       case r of
+         #{const SQL_NO_DATA} -> return ()
+         x -> checkError "execDirect" (StmtHandle sthptr) x
+       
+       rcols <- getNumResultCols sthptr
+
+       case rcols of 
+         0 -> do rowcount <- getSqlRowCount sthptr
+                 ffinish fsthptr
+                 touchForeignPtr fsthptr
+                 return (fromIntegral rowcount)
+         colcount -> do touchForeignPtr fsthptr
                         return 0
 
 getNumResultCols :: Ptr CStmt -> IO #{type SQLSMALLINT}
@@ -934,6 +967,10 @@ foreign import #{CALLCONV} safe "sql.h SQLPrepare"
 
 foreign import #{CALLCONV} safe "sql.h SQLExecute"
   sqlExecute :: Ptr CStmt -> IO #{type SQLRETURN}
+
+foreign import #{CALLCONV} safe "sql.h SQLExecDirect"
+  sqlExecDirect :: Ptr CStmt -> CString -> #{type SQLINTEGER} ->
+                   IO #{type SQLRETURN}
 
 foreign import #{CALLCONV} safe "sql.h SQLAllocHandle"
   sqlAllocStmtHandle :: #{type SQLSMALLINT} -> Ptr CConn ->

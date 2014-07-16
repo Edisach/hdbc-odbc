@@ -8,6 +8,7 @@ import Control.Monad (forM, mapM, mapM_)
 benchInsert conn n = bgroup "Insert" 
               [ benchInsertExecuteMany conn n
               , benchInsertExecute conn n 
+              , benchInsertRun conn n
               , benchInsertExecuteMany conn n ]
 
 -- Utilities
@@ -15,7 +16,7 @@ setupInsert :: IConnection conn => conn -> IO ()
 setupInsert conn = do
   run conn "DROP TABLE IF EXISTS testInsert" []
   run conn
-    "CREATE TABLE testInsert (char CHAR(10), int INTEGER, float FLOAT)" []
+    "CREATE TABLE testInsert (chars CHAR(10), ints INTEGER, floats FLOAT)" []
   commit conn
 
 teardownInsert :: IConnection conn => conn -> IO()
@@ -41,4 +42,7 @@ benchInsertExecuteMany conn n = bench "InsertExecuteMany" $ nfIO $ do
   executeMany stmt $ map toTestInsert [1 .. n]
   commit conn
 
-
+benchInsertRun :: IConnection conn => conn -> Int -> Benchmark
+benchInsertRun conn n = bench "InsertRun" $ nfIO $ do
+  mapM_ (run conn "INSERT INTO testInsert VALUES (?, ?, ?)") $ map toTestInsert [1 .. n]
+  commit conn

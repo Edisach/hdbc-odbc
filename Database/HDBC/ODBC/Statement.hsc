@@ -8,12 +8,15 @@ module Database.HDBC.ODBC.Statement (
    newSth,
    fgettables,
    fexecdirect,
-   fdescribetable
+   fdescribetable,
+   ChildList,
+   addChild,
+   closeAllChildren
  ) where
 
 import Database.HDBC.Types
 import Database.HDBC
-import Database.HDBC.DriverUtils
+--import Database.HDBC.DriverUtils
 import Database.HDBC.ODBC.Types
 import Database.HDBC.ODBC.Utils
 import Database.HDBC.ODBC.TypeConv
@@ -69,7 +72,6 @@ fakeExecute' sstate  = withConn (dbo sstate) $ \cconn ->
                        withCStringLen (squery sstate) $ \(cquery, cqlen) ->
                        alloca $ \(psthptr::Ptr (Ptr CStmt)) ->
     do l "in fexecute"
-       -- public_ffinish sstate  
        rc1 <- sqlAllocStmtHandle #{const SQL_HANDLE_STMT} cconn psthptr
        sthptr <- peek psthptr
        wrappedsthptr <- withRawConn (dbo sstate)
@@ -94,6 +96,8 @@ data SState = SState
   , squery     :: String
   , colinfomv  :: MVar [(String, SqlColDesc)]
   , bindColsMV :: MVar (Maybe [(BindCol, Ptr #{type SQLLEN})])
+  , sthptr     :: WrappedCStmt
+  , fsthptr    :: Stmt
   }
 
 -- FIXME: we currently do no prepare optimization whatsoever.
@@ -103,21 +107,24 @@ newSState indbo query =
     do newstomv     <- newMVar Nothing
        newcolinfomv <- newMVar []
        newBindCols  <- newMVar Nothing
+       (ptr, fptr)  <- fprepare indbo query
        return SState
          { stomv      = newstomv
          , dbo        = indbo
          , squery     = query
          , colinfomv  = newcolinfomv
          , bindColsMV = newBindCols
+         , sthptr     = ptr
+         , fsthptr    = fptr
          }
 
 wrapStmt :: SState -> Statement
 wrapStmt sstate = Statement
-  { execute        = fexecute sstate
+  { execute        = fexecute' sstate
   , executeRaw     = return ()
   , executeMany    = fexecutemany sstate
   , finish         = public_ffinish sstate
-  , fetchRow       = ffetchrow sstate
+  , fetchRow       = ffetchrow' sstate
   , originalQuery  = (squery sstate)
   , getColumnNames = readMVar (colinfomv sstate) >>= (return . map fst)
   , describeResult = readMVar (colinfomv sstate)
@@ -128,8 +135,14 @@ newSth indbo mchildren query =
     do l "in newSth"
        sstate <- newSState indbo query
        let retval = wrapStmt sstate
+       l $ "newSth retval: " ++ show (originalQuery retval)
        addChild mchildren retval
+       x <- readMVar mchildren
+       --mapM_ printfunc x -- only enable for testing
        return retval
+         where
+           printfunc child = 
+             do l $ "child: " ++ show (originalQuery child)
 
 makesth :: Conn -> [Char] -> IO (ForeignPtr WrappedCStmt)
 makesth iconn name = alloca $ \(psthptr::Ptr (Ptr CStmt)) ->
@@ -145,14 +158,25 @@ makesth iconn name = alloca $ \(psthptr::Ptr (Ptr CStmt)) ->
 
 wrapTheStmt :: Conn -> Stmt -> IO (Statement, SState)
 wrapTheStmt iconn fsthptr =
-    do sstate <- newSState iconn ""
-       sstate <- newSState iconn ""
+    do sstate <- newSState iconn "SELECT 1"
        swapMVar (stomv sstate) (Just fsthptr)
        let sth = wrapStmt sstate
        return (sth, sstate)
 
 fgettables :: Conn -> IO [String]
 fgettables iconn =
+    do sstate <- newSState iconn "SELECT 1"
+       l "fgettables': after newSState"
+       simpleSqlTables (sthptr sstate) >>= checkError "gettables simpleSqlTables" (StmtHandle (sthptr sstate))
+       l "fgettables': after simpleSqlTables"
+       fgetcolinfo (sthptr sstate) >>= swapMVar (colinfomv sstate)
+       l "fgettables': after fgetcolinfo"
+       results <- fetchAllRows' (wrapStmt sstate)
+       l $ "fgettables': results " ++ show results
+       return $ map (\x -> fromSql (x !! 2)) results
+
+fgettables' :: Conn -> IO [String]
+fgettables' iconn =
     do fsthptr <- makesth iconn "fgettables"
        l "fgettables: after makesth"
        withStmt fsthptr (\sthptr ->
@@ -162,14 +186,26 @@ fgettables iconn =
                         )
        l "fgettables: after withStmt"
        (sth, sstate) <- wrapTheStmt iconn fsthptr
-       withStmt fsthptr (\sthptr -> fgetcolinfo sthptr >>= swapMVar (colinfomv sstate))
        l "fgettables: after wrapTheStmt"
+       withStmt fsthptr (\sthptr -> fgetcolinfo sthptr >>= swapMVar (colinfomv sstate))
+       l "fgettables: after withStmt 2"
        results <- fetchAllRows' sth
        l ("fgettables: results: " ++ (show results))
        return $ map (\x -> fromSql (x !! 2)) results
 
 fdescribetable :: Conn -> String -> IO [(String, SqlColDesc)]
-fdescribetable iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) $ 
+fdescribetable iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) $
+                                 \(cs, csl) ->
+    do sstate <- newSState iconn "SELECT 1"
+       rc <- simpleSqlColumns (sthptr sstate) cs (fromIntegral csl)
+       checkError "fdescribetable simpleSqlColumns" (StmtHandle (sthptr sstate)) rc
+       fgetcolinfo (sthptr sstate) >>= swapMVar (colinfomv sstate)
+       results <- fetchAllRows' (wrapStmt sstate)
+       l $ "results: " ++ show results
+       return $ map fromOTypeCol results
+
+fdescribetable' :: Conn -> String -> IO [(String, SqlColDesc)]
+fdescribetable' iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) $ 
                                  \(cs, csl) ->
     do fsthptr <- makesth iconn "fdescribetable"
        withStmt fsthptr (\sthptr ->
@@ -182,6 +218,25 @@ fdescribetable iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) 
        results <- fetchAllRows' sth
        l (show results)
        return $ map fromOTypeCol results
+
+fprepare :: Conn -> String -> IO (Ptr CStmt, ForeignPtr WrappedCStmt)
+fprepare dbo query =
+  withConn dbo $ \cconn ->
+  B.useAsCStringLen (BUTF8.fromString query) $ \(cquery, cqlen) ->
+  alloca $ \(psthptr :: Ptr (Ptr CStmt)) ->
+    do l $ "in fprepare: " ++ show query
+       rc <- sqlAllocStmtHandle #{const SQL_HANDLE_STMT} cconn psthptr
+       sthptr <- peek psthptr
+       wrappedsthptr <- withRawConn dbo (\rconn -> wrapstmt sthptr rconn)
+       fsthptr <- newForeignPtr sqlFreeHandleSth_ptr wrappedsthptr
+       checkError "execute allocHandle" (DbcHandle cconn) rc
+       l $ "psthptr is " ++ show psthptr
+       l $ "sthptr is " ++ show sthptr
+       l $ "fsthptr is " ++ show fsthptr
+
+       sqlPrepare sthptr cquery (fromIntegral cqlen) >>=
+           checkError "execute prepare" (StmtHandle sthptr)
+       return (sthptr, fsthptr)
 
 {- For now, we try to just  handle things as simply as possible.
 FIXME lots of room for improvement here (types, etc). -}
@@ -224,6 +279,34 @@ fexecute sstate args =
                         touchForeignPtr fsthptr
                         return 0
 
+fexecute' :: SState -> [SqlValue] -> IO Integer
+fexecute' sstate args =
+  do l $ "in fexecute': " ++ show (squery sstate) ++ show args
+     private_ffinish sstate
+     bindArgs <- zipWithM (bindParam (sthptr sstate)) args [1..]
+     l $ "ready for sqlExecute:" ++ show (squery sstate) ++ show args
+     r <- sqlExecute (sthptr sstate)
+     l $ "r is " ++ show r
+     mapM_ (\(x,y) -> free x >> free y) (catMaybes bindArgs)
+     l "executed" 
+     case r of
+       #{const SQL_NO_DATA} -> return ()
+       x -> checkError "execute execute" (StmtHandle (sthptr sstate)) x
+     
+     rc <- getNumResultCols (sthptr sstate)
+     l $ "getNumResultCols is " ++ show rc
+
+     case rc of
+       0 -> do rowcount <- getSqlRowCount (sthptr sstate)
+               fclose (fsthptr sstate)
+               swapMVar (colinfomv sstate) []
+               touchForeignPtr (fsthptr sstate)
+               return (fromIntegral rowcount)
+       colcount -> do fgetcolinfo (sthptr sstate) >>= swapMVar (colinfomv sstate)
+                      swapMVar (stomv sstate) (Just (fsthptr sstate))
+                      touchForeignPtr (fsthptr sstate)
+                      return 0
+
 fexecdirect :: Conn -> String -> [SqlValue] -> IO Integer
 fexecdirect conn stmt args =
   withConn conn $ \cconn ->
@@ -232,8 +315,8 @@ fexecdirect conn stmt args =
     do l $ "in fexecdirect: " ++ show stmt ++ show args
        rc <- sqlAllocStmtHandle #{const SQL_HANDLE_STMT} cconn psthptr
        sthptr <- peek psthptr
-       wrapsthptr <- withRawConn conn (\rawconn -> wrapstmt sthptr rawconn)
-       fsthptr <- newForeignPtr sqlFreeHandleSth_ptr wrapsthptr
+       l $ "sthptr is " ++ show sthptr
+       l $ "r is " ++ show rc
        checkError "execDirect allocHandle" (DbcHandle cconn) rc
 
        bindArgs <- zipWithM (bindParam sthptr) args [1..]
@@ -250,10 +333,9 @@ fexecdirect conn stmt args =
 
        case rcols of 
          0 -> do rowcount <- getSqlRowCount sthptr
-                 ffinish fsthptr
-                 touchForeignPtr fsthptr
+                 sqlFreeHandleSth_app psthptr
                  return (fromIntegral rowcount)
-         colcount -> do touchForeignPtr fsthptr
+         colcount -> do sqlFreeHandleSth_app psthptr
                         return 0
 
 getNumResultCols :: Ptr CStmt -> IO #{type SQLSMALLINT}
@@ -281,7 +363,7 @@ bindParam sthptr arg icol =  alloca $ \pdtype ->
 
     do l $ "Binding col " ++ show icol ++ ": " ++ show arg
        rc1 <- sqlDescribeParam sthptr icol pdtype pcolsize pdecdigits pnullable
-       l $ "rc1 is " ++ show (isOK rc1)
+       l $ "rc1 is " ++ show rc1
        when (not (isOK rc1)) $ -- Some drivers don't support that call
           do poke pdtype #{const SQL_CHAR}
              poke pcolsize 0
@@ -302,14 +384,19 @@ bindParam sthptr arg icol =  alloca $ \pdtype ->
                        return Nothing
          x -> do -- Otherwise, we have to allocate RAM, make sure it's
                  -- not freed now, and pass it along...
+                  l $ "arg is " ++ show x
                   (csptr, cslen) <- cstrUtf8BString (fromSql x)
                   do pcslen <- malloc 
                      poke pcslen (fromIntegral cslen)
                      rc2 <- sqlBindParameter sthptr (fromIntegral icol)
                        #{const SQL_PARAM_INPUT}
                        #{const SQL_C_CHAR} coltype 
-                       (if isOK rc1 then colsize else fromIntegral cslen + 1) decdigits
-                       csptr (fromIntegral cslen + 1) pcslen
+                       (if isOK rc1 then colsize else fromIntegral cslen) 
+                       decdigits csptr (fromIntegral (cslen)) pcslen
+                     l $ "rc2 is " ++ show rc2
+                     --hPutStrLn stderr $ "icol " ++ show icol
+                     --hPutStrLn stderr $ "cslen " ++ show cslen
+                     --hPutStrLn stderr $ "x " ++ show x
                      if isOK rc2
                         then do -- We bound it.  Make foreignPtrs and return.
                                 return $ Just (pcslen, csptr)
@@ -339,6 +426,26 @@ cstrUtf8BString bs = do
         -- return ptr
         return (res, len)
 
+ffetchrow' :: SState -> IO (Maybe [SqlValue])
+ffetchrow' sstate = 
+  do l $ "ffetchrow'"
+     bindCols <- getBindCols sstate (sthptr sstate)
+     l "ffetchrow': fetching"
+     rc <- sqlFetch (sthptr sstate)
+     l $ "rc is: " ++ show rc
+     if rc == #{const SQL_NO_DATA}
+       then do
+         l "no more rows"
+         fclose (fsthptr sstate)
+         return Nothing
+       else do
+         l "fetching data"
+         checkError "sqlFetch" (StmtHandle (sthptr sstate)) rc
+         sqlValues <- if rc == #{const SQL_SUCCESS} || rc == #{const SQL_SUCCESS_WITH_INFO}
+           then mapM (bindColToSqlValue (sthptr sstate)) bindCols
+           else raiseError "sqlGetData" rc (StmtHandle (sthptr sstate))
+         return (Just sqlValues)
+
 ffetchrow :: SState -> IO (Maybe [SqlValue])
 ffetchrow sstate = modifyMVar (stomv sstate) $ \stmt -> do
   l $ "ffetchrow"
@@ -350,10 +457,11 @@ ffetchrow sstate = modifyMVar (stomv sstate) $ \stmt -> do
       bindCols <- getBindCols sstate cstmt
       l "ffetchrow: fetching"
       rc <- sqlFetch cstmt
+      l $ "rc is " ++ show rc
       if rc == #{const SQL_NO_DATA}
         then do
           l "ffetchrow: no more rows"
-          ffinish cmstmt
+          fclose cmstmt
           return (Nothing, Nothing)
         else do
           l "ffetchrow: fetching data"
@@ -369,10 +477,12 @@ getBindCols sstate cstmt = do
   modifyMVar (bindColsMV sstate) $ \mBindCols ->
     case mBindCols of
       Nothing -> do
+        l "nothing"
         cols <- getNumResultCols cstmt
         pBindCols <- mapM (mkBindCol sstate cstmt) [1 .. cols]
         return (Just pBindCols, pBindCols)
       Just bindCols -> do
+        l "Just bindCols"
         return (mBindCols, bindCols)
 
 -- This is only for String data. For binary fix should be very easy. Just check the column type and use buflen instead of buflen - 1
@@ -881,7 +991,8 @@ bindColToSqlValue' _ (BindColGetData _) _ =
 
 fgetcolinfo :: Ptr CStmt -> IO [(String, SqlColDesc)]
 fgetcolinfo cstmt =
-    do ncols <- getNumResultCols cstmt
+    do l "fgetcolinfo" 
+       ncols <- getNumResultCols cstmt
        mapM getname [1..ncols]
     where getname icol = alloca $ \colnamelp ->
                          allocaBytes 128 $ \cscolname ->
@@ -901,12 +1012,13 @@ fgetcolinfo cstmt =
 -- FIXME: needs a faster algorithm.
 fexecutemany :: SState -> [[SqlValue]] -> IO ()
 fexecutemany sstate arglist =
-    mapM_ (fexecute sstate) arglist >> return ()
+    mapM_ (fexecute' sstate) arglist >> return ()
 
 -- Finish and change state
 public_ffinish :: SState -> IO ()
 public_ffinish sstate = do
-  l "public_ffinish"
+  l $ "public_ffinish " ++ show (squery sstate)
+  finalizeForeignPtr (fsthptr sstate)
   modifyMVar_ (stomv sstate) freeMStmt
   modifyMVar_ (bindColsMV sstate) freeBindCols
  where
@@ -918,9 +1030,40 @@ public_ffinish sstate = do
     mapM_ (\(bindCol, pSqlLen) -> freeBindCol bindCol >> free pSqlLen) bindCols
     return Nothing
 
+private_ffinish :: SState -> IO ()
+private_ffinish sstate = do
+  l $ "private_ffinish " ++ show (squery sstate)
+  fclose (fsthptr sstate)
+  --modifyMVar_ (stomv sstate) freeMStmt
+  modifyMVar_ (bindColsMV sstate) freeBindCols
+    where
+      freeMStmt Nothing    = return Nothing
+      freeMStmt (Just sth) = fclose sth >> return (Just sth)
+      freeBindCols Nothing = return Nothing
+      freeBindCols (Just bindCols) = do
+        l "private_ffinish: freeing bindcols"
+        mapM_ (\(bindCol, pSqlLen) -> freeBindCol bindCol >> free pSqlLen) bindCols
+        return Nothing
+
 ffinish :: Stmt -> IO ()
 ffinish stmt = withRawStmt stmt $ sqlFreeHandleSth_app 
 
+fclose :: Stmt -> IO #{type SQLRETURN}
+fclose stmt = 
+  do l "fclose"
+     withStmt stmt $ flip sqlFreeStmt #{const SQL_CLOSE}
+
+closeAllChildren :: ChildList -> IO ()
+closeAllChildren mcl = 
+  do children <- readMVar mcl
+     mapM_ closefunc children
+       where closefunc child = do finish child
+
+type ChildList = MVar [Statement]
+
+addChild :: ChildList -> Statement -> IO ()
+addChild mcl stmt = 
+  do modifyMVar_ mcl (\l -> return (stmt : l))
 
 foreign import ccall safe "hdbc-odbc-helper.h wrapobjodbc"
   wrapstmt :: Ptr CStmt -> Ptr WrappedCConn -> IO (Ptr WrappedCStmt)
@@ -971,6 +1114,10 @@ foreign import #{CALLCONV} safe "sql.h SQLExecute"
 foreign import #{CALLCONV} safe "sql.h SQLExecDirect"
   sqlExecDirect :: Ptr CStmt -> CString -> #{type SQLINTEGER} ->
                    IO #{type SQLRETURN}
+
+foreign import #{CALLCONV} safe "sql.h SQLFreeStmt"
+  sqlFreeStmt :: Ptr CStmt -> #{type SQLSMALLINT} ->
+                 IO #{type SQLRETURN}
 
 foreign import #{CALLCONV} safe "sql.h SQLAllocHandle"
   sqlAllocStmtHandle :: #{type SQLSMALLINT} -> Ptr CConn ->

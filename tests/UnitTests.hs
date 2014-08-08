@@ -52,7 +52,7 @@ basicQuery = dbTest $ (\dbh ->
 createTable = dbTest $ (\dbh ->
       do run dbh "DROP TABLE IF EXISTS test1" []
          commit dbh
-         run dbh "CREATE TABLE test1 (name VARCHAR(10), value INTEGER)" []
+         run dbh "CREATE TABLE test1 (name VARCHAR(20), value INTEGER)" []
          commit dbh
          )
 
@@ -155,7 +155,8 @@ testRollback = dbTest $ (\dbh ->
          fetchAllRows qry >>= (assertEqual "first commit" [[iToSql 1]])
          execute sth [iToSql 5]
          rollback dbh
-         fetchAllRows qry >>= (assertEqual "rollback" [])
+         execute qry []
+         fetchAllRows qry >>= (assertEqual "rollback" [[iToSql 1]])
          )
 
 testWithTransaction = dbTest$ (\dbh ->
@@ -168,7 +169,7 @@ testWithTransaction = dbTest$ (\dbh ->
          commit dbh
          fetchAllRows qry >>= assertEqual "commit" [[iToSql 1]]
          -- deliberately fail 
-         catch (withTransaction dbh (\_ -> do execute qry [iToSql 2]
+         catch (withTransaction dbh (\_ -> do execute sth [iToSql 2]
                                               fail "woops"))
                (\e -> do return (e::IOException)
                          return ())
@@ -185,7 +186,6 @@ testWithTransaction = dbTest$ (\dbh ->
 
 testGetTables = dbTest $ (\dbh ->
       do tables <- getTables dbh
-         commit dbh
          assertBool "getTables" ("test1" `elem` tables)
          )
 
@@ -203,7 +203,6 @@ testSRun = dbTest $ (\dbh ->
          assertEqual "another row entered" b 1
          yss <- quickQuery' dbh "SELECT value FROM test1 WHERE name='sRun2'" []
          vss <- quickQuery' dbh "SELECT value FROM test1 WHERE name='sRun1'" []
-         commit dbh
          assertEqual "'yes'" [[iToSql 3]] vss
          assertEqual "null" [[SqlNull]] yss
          )
@@ -238,9 +237,7 @@ testFetchRow = dbTest $ (\dbh ->
          )
 
 testFetchRowAL = dbTest $ (\dbh ->
-      do run dbh "INSERT INTO test1 VALUES ('fetchRowAL', 1)" []
-         commit dbh
-         qry <- prepare dbh "SELECT * FROM test2"
+      do qry <- prepare dbh "SELECT * FROM test2"
          execute qry []
          commit dbh
          fetchRowAL qry >>= assertEqual "one row" (Just alRows)

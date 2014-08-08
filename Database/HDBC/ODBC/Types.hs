@@ -21,4 +21,3 @@ data CStmt = CStmt
 type WrappedCStmt = Ptr CStmt
 type Stmt = ForeignPtr WrappedCStmt
 
-

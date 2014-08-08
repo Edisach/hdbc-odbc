@@ -6,7 +6,7 @@ module Database.HDBC.ODBC.Connection (connectODBC, Impl.Connection) where
 
 import Database.HDBC.Types
 import Database.HDBC
-import Database.HDBC.DriverUtils
+--import Database.HDBC.DriverUtils
 import qualified Database.HDBC.ODBC.ConnectionImpl as Impl
 import Database.HDBC.ODBC.Types
 import Database.HDBC.ODBC.Statement
@@ -23,6 +23,7 @@ import Control.Concurrent.MVar
 import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BUTF8
+import System.Mem.Weak
 
 #ifdef mingw32_HOST_OS
 #include <windows.h>
@@ -35,6 +36,12 @@ import qualified Data.ByteString.UTF8 as BUTF8
 #else
 #let CALLCONV = "ccall"
 #endif
+
+import System.IO (hPutStrLn, stderr)
+
+l :: String -> IO ()
+l _ = return ()
+--l m = hPutStrLn stderr ("\n" ++ m)
 
 {- | Connect to an ODBC server.
 
@@ -180,10 +187,16 @@ frollback iconn = withConn iconn $ \cconn ->
 
 fdisconnect iconn mchildren  = withRawConn iconn $ \rawconn -> 
                                withConn iconn $ \llconn ->
-    do closeAllChildren mchildren
+    do l $ "fdisconnect"
+       x <- readMVar mchildren
+       mapM_ printfunc x
+       closeAllChildren mchildren
        res <- sqlFreeHandleDbc_app rawconn
        -- FIXME: will this checkError segfault?
        checkError "disconnect" (DbcHandle $ llconn) res
+     where 
+       printfunc child = 
+         do l $ "closing children: " ++ show (originalQuery child)
 
 foreign import #{CALLCONV} safe "sql.h SQLAllocHandle"
   sqlAllocHandle :: #{type SQLSMALLINT} -> Ptr () -> 

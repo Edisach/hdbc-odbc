@@ -10,6 +10,8 @@ benchBasic conn n = bgroup "Basic"
               , benchSelectRun1 conn
               , benchQuickQuery conn
               , benchQuickQuery' conn
+              , benchPrepare conn
+              , benchPrepareBind conn
               , benchSelectExecute conn n
               , benchSelectExecuteMany conn n
               , benchInsertRun conn
@@ -69,6 +71,14 @@ benchInsertRunBind conn = bench "InsertRun Bind" $ nfIO $ do
   run conn "INSERT INTO testBasic VALUES (?)" [toSql "1"]
   commit conn
 
+benchPrepare conn = bench "Prepare 1" $ nfIO $ do
+  sth <- prepare conn "INSERT INTO testBasic VALUES ('1')"
+  commit conn
+
+benchPrepareBind conn = bench "Prepare bind" $ nfIO $ do
+  sth <- prepare conn "INSERT INTO testBasic VALUES(?)"
+  commit conn
+
 benchInsertExecute conn = bench "InsertExecute 1" $ nfIO $ do
   sth <- prepare conn "INSERT INTO testBasic VALUES ('1')"
   execute sth []
@@ -81,7 +91,7 @@ benchInsertExecuteBind conn = bench "InsertExecute Bind" $ nfIO $ do
 
 benchInsertExecuteMany conn = bench "InsertExecuteMany 1" $ nfIO $ do
   sth <- prepare conn "INSERT INTO testBasic VALUES ('2')"
-  executeMany sth []
+  executeMany sth [[]]
   commit conn
 
 benchInsertExecuteManyBind conn = bench "InsertExecuteMany Bind" $ nfIO $ do

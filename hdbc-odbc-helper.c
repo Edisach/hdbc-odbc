@@ -83,6 +83,9 @@ SQLRETURN sqlFreeHandleDbc_app(finalizeonce *res) {
 #endif
   if (res->isfinalized)
     return 0;
+#ifdef HDBC_DEBUG
+  fprintf(stderr, "\nSQLDisconnect now \n");
+#endif
   retval = SQLDisconnect((SQLHDBC) (res->encapobj));
   if (SQL_SUCCEEDED(retval)) {
     SQLFreeHandle(SQL_HANDLE_DBC, (SQLHANDLE) (res->encapobj));
@@ -90,6 +93,9 @@ SQLRETURN sqlFreeHandleDbc_app(finalizeonce *res) {
     res->isfinalized = 1;
     res->encapobj = NULL;
   }
+#ifdef HDBC_DEBUG
+  fprintf(stderr, "\nSQLDisconnect done \n");
+#endif
   return retval;
 }
 

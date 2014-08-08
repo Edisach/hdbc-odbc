@@ -10,7 +10,7 @@ import Database.HDBC.ODBC
 
 import Utils
 
-createSCTable = "CREATE TABLE testSC (string VARCHAR(10), int INTEGER, char CHAR(3), bool BOOLEAN, double DOUBLE)" 
+createSCTable = "CREATE TABLE testSC (string VARCHAR(10), int INTEGER, char CHAR(3), bool BOOLEAN)" 
 
 sTests = testGroup "SmallCheck tests"
   [ testCase "Create table" testCreateTable
@@ -20,7 +20,7 @@ sTests = testGroup "SmallCheck tests"
   , testProperty "testInsertInt" testInsertInt
   , testProperty "testInsertCharacter" testInsertCharacter
   , testProperty "testInsertBool" testInsertBool
-  , testProperty "testInsertDouble" testInsertDouble
+  --, testProperty "testInsertDouble" testInsertDouble
   , testProperty "testInsertRational" testInsertRational
   ]
 
@@ -48,7 +48,7 @@ testInsertString = (\x -> monadic $ dbTest $ (\dbh ->
      commit dbh
      v <- quickQuery' dbh "SELECT string FROM testSC" []
      commit dbh
-     return (map (map fromSql) v == [[x]])
+     return (v == [[toSql x]])
      ))
 
 testInsertInt = (\x -> monadic $ dbTest $ (\dbh ->

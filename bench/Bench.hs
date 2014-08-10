@@ -18,13 +18,15 @@ main = do
   conn <- connectODBC "DSN=HDBC-test"
   setupInsert conn
   setupSelect conn 10000
+  setupBasic conn
   defaultMain 
     [ benchBasic conn 1000
     , benchTypes
-    --, benchInsert conn 1000
+    , benchInsert conn 1000
     , benchSelect conn 1000]
   teardownInsert conn
   teardownSelect conn
+  teardownBasic conn
   disconnect conn
 
 

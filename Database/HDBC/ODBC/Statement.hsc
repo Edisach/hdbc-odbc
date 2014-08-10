@@ -47,6 +47,9 @@ l :: String -> IO ()
 l _ = return ()
 --l m = hPutStrLn stderr ("\n" ++ m)
 
+n :: String -> IO ()
+n m = hPutStrLn stderr ("\n" ++ m)
+
 #ifdef mingw32_HOST_OS
 #include <windows.h>
 #endif
@@ -323,6 +326,7 @@ fexecdirect conn stmt args =
        l $ "Ready for sqlExecDirect" 
        r <- sqlExecDirect sthptr cquery (fromIntegral cqlen)
 
+       l $ "r: " ++ show r
        mapM_ (\(x,y) -> free x >> free y) (catMaybes bindArgs)
 
        case r of
@@ -330,6 +334,7 @@ fexecdirect conn stmt args =
          x -> checkError "execDirect" (StmtHandle sthptr) x
        
        rcols <- getNumResultCols sthptr
+       l $ "rcols: " ++ show rcols
 
        case rcols of 
          0 -> do rowcount <- getSqlRowCount sthptr

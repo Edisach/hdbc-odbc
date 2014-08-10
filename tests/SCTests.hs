@@ -10,7 +10,7 @@ import Database.HDBC.ODBC
 
 import Utils
 
-createSCTable = "CREATE TABLE testSC (string VARCHAR(10), int INTEGER, char CHAR(3), bool BOOLEAN)" 
+createSCTable = "CREATE TABLE testSC (typestring VARCHAR(10), typeint INTEGER, typechar CHAR(3), typebool BOOLEAN)" 
 
 sTests = testGroup "SmallCheck tests"
   [ testCase "Create table" testCreateTable
@@ -43,60 +43,60 @@ testMonadic = (\x -> monadic $ dbTest $ (\dbh ->
 
 testInsertString = (\x -> monadic $ dbTest $ (\dbh ->
   do run dbh "DELETE FROM testSC" []
-     sth <- prepare dbh "INSERT INTO testSC(string) VALUES (?)"
+     sth <- prepare dbh "INSERT INTO testSC(typestring) VALUES (?)"
      execute sth [toSql (x :: String)]
      commit dbh
-     v <- quickQuery' dbh "SELECT string FROM testSC" []
+     v <- quickQuery' dbh "SELECT typestring FROM testSC" []
      commit dbh
      return (v == [[toSql x]])
      ))
 
 testInsertInt = (\x -> monadic $ dbTest $ (\dbh ->
   do run dbh "DELETE FROM testSC" []
-     sth <- prepare dbh "INSERT INTO testSC(int) VALUES (?)"
+     sth <- prepare dbh "INSERT INTO testSC(typeint) VALUES (?)"
      execute sth [toSql (x :: Int)]
      commit dbh
-     v <- quickQuery' dbh "SELECT int FROM testSC" []
+     v <- quickQuery' dbh "SELECT typeint FROM testSC" []
      commit dbh
      return (map (map fromSql) v == [[x]])
      ))
 
 testInsertCharacter = (\x -> length x == 3 ==> monadic $ dbTest $ (\dbh ->
   do run dbh "DELETE FROM testSC" []
-     sth <- prepare dbh "INSERT INTO testSC(char) VALUES (?)"
+     sth <- prepare dbh "INSERT INTO testSC(typechar) VALUES (?)"
      execute sth [toSql (x :: [Char])]
      commit dbh
-     v <- quickQuery' dbh "SELECT char FROM testSC" []
+     v <- quickQuery' dbh "SELECT typechar FROM testSC" []
      commit dbh
      return (map (map fromSql) v == [[x]])
      ))
 
 testInsertBool = (\x -> monadic $ dbTest $ (\dbh ->
   do run dbh "DELETE FROM testSC" []
-     sth <- prepare dbh "INSERT INTO testSC(bool) VALUES (?)"
+     sth <- prepare dbh "INSERT INTO testSC(typebool) VALUES (?)"
      execute sth [toSql (x :: Bool)]
      commit dbh
-     v <- quickQuery' dbh "SELECT bool FROM testSC" []
+     v <- quickQuery' dbh "SELECT typebool FROM testSC" []
      commit dbh
      return (map (map fromSql) v == [[x]])
      ))
 
 testInsertDouble = (\x -> monadic $ dbTest $ (\dbh ->
   do run dbh "DELETE FROM testSC" []
-     sth <- prepare dbh "INSERT INTO testSC(double) VALUES (?)"
+     sth <- prepare dbh "INSERT INTO testSC(typedouble) VALUES (?)"
      execute sth [toSql (x :: Double)]
      commit dbh
-     v <- quickQuery' dbh "SELECT double FROM testSC" []
+     v <- quickQuery' dbh "SELECT typedouble FROM testSC" []
      commit dbh
      return (map (map fromSql) v == [[x]])
      ))
 
 testInsertRational = (\x -> monadic $ dbTest $ (\dbh ->
   do run dbh "DELETE FROM testSC" []
-     sth <- prepare dbh "INSERT INTO testSC(string) VALUES(?)"
+     sth <- prepare dbh "INSERT INTO testSC(typestring) VALUES(?)"
      execute sth [toSql (x :: Rational)]
      commit dbh
-     v <- quickQuery' dbh "SELECT string FROM testSC" []
+     v <- quickQuery' dbh "SELECT typestring FROM testSC" []
      commit dbh
      return (map (map fromSql) v == [[x]])
      ))

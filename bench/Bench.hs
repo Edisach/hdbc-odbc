@@ -19,14 +19,17 @@ main = do
   setupInsert conn
   setupSelect conn 10000
   setupBasic conn
+  setupTypes conn
   defaultMain 
-    [ benchBasic conn 1000
-    , benchTypes
-    , benchInsert conn 1000
-    , benchSelect conn 1000]
+    [ 
+    benchBasic conn 1000,
+    benchTypes conn,
+    benchInsert conn 1000,
+    benchSelect conn 1000]
   teardownInsert conn
   teardownSelect conn
   teardownBasic conn
+  teardownTypes conn
   disconnect conn
 
 

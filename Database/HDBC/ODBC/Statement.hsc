@@ -16,7 +16,6 @@ module Database.HDBC.ODBC.Statement (
 
 import Database.HDBC.Types
 import Database.HDBC
---import Database.HDBC.DriverUtils
 import Database.HDBC.ODBC.Types
 import Database.HDBC.ODBC.Utils
 import Database.HDBC.ODBC.TypeConv
@@ -123,7 +122,7 @@ newSState indbo query =
 
 wrapStmt :: SState -> Statement
 wrapStmt sstate = Statement
-  { execute        = fexecute' sstate
+  { execute        = fexecute sstate
   , executeRaw     = return ()
   , executeMany    = fexecutemany sstate
   , finish         = public_ffinish sstate
@@ -178,24 +177,6 @@ fgettables iconn =
        l $ "fgettables': results " ++ show results
        return $ map (\x -> fromSql (x !! 2)) results
 
-fgettables' :: Conn -> IO [String]
-fgettables' iconn =
-    do fsthptr <- makesth iconn "fgettables"
-       l "fgettables: after makesth"
-       withStmt fsthptr (\sthptr ->
-                             simpleSqlTables sthptr >>=
-                                checkError "gettables simpleSqlTables" 
-                                               (StmtHandle sthptr)
-                        )
-       l "fgettables: after withStmt"
-       (sth, sstate) <- wrapTheStmt iconn fsthptr
-       l "fgettables: after wrapTheStmt"
-       withStmt fsthptr (\sthptr -> fgetcolinfo sthptr >>= swapMVar (colinfomv sstate))
-       l "fgettables: after withStmt 2"
-       results <- fetchAllRows' sth
-       l ("fgettables: results: " ++ (show results))
-       return $ map (\x -> fromSql (x !! 2)) results
-
 fdescribetable :: Conn -> String -> IO [(String, SqlColDesc)]
 fdescribetable iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) $
                                  \(cs, csl) ->
@@ -205,21 +186,6 @@ fdescribetable iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) 
        fgetcolinfo (sthptr sstate) >>= swapMVar (colinfomv sstate)
        results <- fetchAllRows' (wrapStmt sstate)
        l $ "results: " ++ show results
-       return $ map fromOTypeCol results
-
-fdescribetable' :: Conn -> String -> IO [(String, SqlColDesc)]
-fdescribetable' iconn tablename = B.useAsCStringLen (BUTF8.fromString tablename) $ 
-                                 \(cs, csl) ->
-    do fsthptr <- makesth iconn "fdescribetable"
-       withStmt fsthptr (\sthptr ->
-                             simpleSqlColumns sthptr cs (fromIntegral csl) >>=
-                               checkError "fdescribetable simpleSqlColumns"
-                                          (StmtHandle sthptr)
-                        )
-       (sth, sstate) <- wrapTheStmt iconn fsthptr
-       withStmt fsthptr (\sthptr -> fgetcolinfo sthptr >>= swapMVar (colinfomv sstate))
-       results <- fetchAllRows' sth
-       l (show results)
        return $ map fromOTypeCol results
 
 fprepare :: Conn -> String -> IO (Ptr CStmt, ForeignPtr WrappedCStmt)
@@ -243,48 +209,10 @@ fprepare dbo query =
 
 {- For now, we try to just  handle things as simply as possible.
 FIXME lots of room for improvement here (types, etc). -}
+
 fexecute :: SState -> [SqlValue] -> IO Integer
 fexecute sstate args =
-  withConn (dbo sstate) $ \cconn ->
-  B.useAsCStringLen (BUTF8.fromString (squery sstate)) $ \(cquery, cqlen) ->
-  alloca $ \(psthptr::Ptr (Ptr CStmt)) ->
-    do l $ "in fexecute: " ++ show (squery sstate) ++ show args
-       public_ffinish sstate
-       rc1 <- sqlAllocStmtHandle #{const SQL_HANDLE_STMT} cconn psthptr
-       sthptr <- peek psthptr
-       wrappedsthptr <- withRawConn (dbo sstate)
-                        (\rawconn -> wrapstmt sthptr rawconn)
-       fsthptr <- newForeignPtr sqlFreeHandleSth_ptr wrappedsthptr
-       checkError "execute allocHandle" (DbcHandle cconn) rc1
-
-       sqlPrepare sthptr cquery (fromIntegral cqlen) >>= 
-            checkError "execute prepare" (StmtHandle sthptr)
-
-       bindArgs <- zipWithM (bindParam sthptr) args [1..]
-       l $ "Ready for sqlExecute: " ++ show (squery sstate) ++ show args
-       r <- sqlExecute sthptr
-       mapM_ (\(x, y) -> free x >> free y) (catMaybes bindArgs)
-
-       case r of
-         #{const SQL_NO_DATA} -> return () -- Update that did nothing
-         x -> checkError "execute execute" (StmtHandle sthptr) x
-
-       rc <- getNumResultCols sthptr
-
-       case rc of
-         0 -> do rowcount <- getSqlRowCount sthptr
-                 ffinish fsthptr
-                 swapMVar (colinfomv sstate) []
-                 touchForeignPtr fsthptr
-                 return (fromIntegral rowcount)
-         colcount -> do fgetcolinfo sthptr >>= swapMVar (colinfomv sstate)
-                        swapMVar (stomv sstate) (Just fsthptr)
-                        touchForeignPtr fsthptr
-                        return 0
-
-fexecute' :: SState -> [SqlValue] -> IO Integer
-fexecute' sstate args =
-  do l $ "in fexecute': " ++ show (squery sstate) ++ show args
+  do l $ "in fexecute: " ++ show (squery sstate) ++ show args
      private_ffinish sstate
      bindArgs <- zipWithM (bindParam (sthptr sstate)) args [1..]
      l $ "ready for sqlExecute:" ++ show (squery sstate) ++ show args
@@ -1017,7 +945,7 @@ fgetcolinfo cstmt =
 -- FIXME: needs a faster algorithm.
 fexecutemany :: SState -> [[SqlValue]] -> IO ()
 fexecutemany sstate arglist =
-    mapM_ (fexecute' sstate) arglist >> return ()
+    mapM_ (fexecute sstate) arglist >> return ()
 
 -- Finish and change state
 public_ffinish :: SState -> IO ()

@@ -6,7 +6,6 @@ module Database.HDBC.ODBC.Connection (connectODBC, Impl.Connection) where
 
 import Database.HDBC.Types
 import Database.HDBC
---import Database.HDBC.DriverUtils
 import qualified Database.HDBC.ODBC.ConnectionImpl as Impl
 import Database.HDBC.ODBC.Types
 import Database.HDBC.ODBC.Statement
@@ -23,7 +22,7 @@ import Control.Concurrent.MVar
 import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BUTF8
-import System.Mem.Weak
+import System.IO (hPutStrLn, stderr)
 
 #ifdef mingw32_HOST_OS
 #include <windows.h>
@@ -37,7 +36,6 @@ import System.Mem.Weak
 #let CALLCONV = "ccall"
 #endif
 
-import System.IO (hPutStrLn, stderr)
 
 l :: String -> IO ()
 l _ = return ()
@@ -152,7 +150,6 @@ mkConn args iconn = withConn iconn $ \cconn ->
                             Impl.disconnect = fdisconnect iconn children,
                             Impl.commit = fcommit iconn,
                             Impl.rollback = frollback iconn,
-                            --Impl.run = frun iconn children,
                             Impl.run = fexecdirect iconn,
                             Impl.prepare = newSth iconn children,
                             Impl.clone = connectODBC args,
@@ -170,12 +167,6 @@ mkConn args iconn = withConn iconn $ \cconn ->
 --------------------------------------------------
 -- Guts here
 --------------------------------------------------
-
-frun conn children query args =
-    do sth <- newSth conn children query
-       res <- execute sth args
-       finish sth
-       return res
 
 fcommit iconn = withConn iconn $ \cconn ->
     sqlEndTran #{const SQL_HANDLE_DBC} cconn #{const SQL_COMMIT}

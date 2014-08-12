@@ -22,10 +22,10 @@ main = do
   setupTypes conn
   defaultMain 
     [ 
-    --benchBasic conn 1000,
-    benchTypes conn]--,
-    --benchInsert conn 1000,
-    --benchSelect conn 1000]
+    benchBasic conn 1000,
+    benchTypes conn,
+    benchInsert conn 1000,
+    benchSelect conn 1000]
   teardownInsert conn
   teardownSelect conn
   teardownBasic conn

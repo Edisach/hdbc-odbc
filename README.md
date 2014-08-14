@@ -105,10 +105,8 @@ to generate):
 
     cabal bench --benchmark-option="-oxxxxxx.html"
 
-You can then run some tests on your database:
-
-    cd testsrc
-    runhaskell runtests.hs
+See the documentation file in the bench folder for explanation of what the
+various benchmarks measure.
 
 Contributing
 ------------

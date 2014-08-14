@@ -52,6 +52,7 @@ benchFromSql = bench "fromSql" $ whnf (fromSql::SqlValue -> Int) (SqlInt64 1)
 
 longString     = replicate   100000 'a'
 longByteString = B.replicate 100000 (fromIntegral 98)
+longInteger    = 10^100000
 
 benchInsertStringShort conn = bench "insertStringShort" $ nfIO $ do
   stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
@@ -109,6 +110,10 @@ benchInsertInteger conn = bench "insertInteger" $ nfIO $ do
   stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
   execute stmt [SqlInteger (fromIntegral 3)]
   commit conn
+
+benchInsertIntegerLong conn = bench "insertIntegerLong" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlInteger longInteger] 
 
 benchInsertChar conn = bench "insertChar" $ nfIO $ do
   stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"

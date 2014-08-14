@@ -56,7 +56,7 @@ Getting Started
 
 Here are some instructions to set up ODBC with a sqlite3 backend, and how
 to communicate with that database with HDBC-ODBC.
-These instructions are written to work with Ubuntu 11.10.
+These instructions are written to work with Ubuntu 11.10. 
 
 First, we'll need to install the appropriate libraries:
 
@@ -75,8 +75,24 @@ Next, fire up the `ODBCConfig` tool to set up a new DSN:
 
     ODBCConfig
 
+Now create a DSN (named HDBC-test for this example) to connect to the SQLite3 
+database. 
+
+You can check that everything is working appropriately in ghci:
+
+    ghci> :m + Database.HDBC Database.HDBC.ODBC
+    ghci> conn <- connectODBC "DSN=HDBC-test"
+    ghci> hdbcDriverName conn
+    "odbc"
+    ghci> hdbcClientVer conn
+    "03.52"
+
+Running Tests and Benchmarks
+----------------------------
+
 If you want to run the HDBC-ODBC test or benchmarking suites, then set/create a
-DSN with name "HDBC-test". Make sure the database has no tables beginning with 
+DSN with name "HDBC-test" to connect to a database of your choice (such as the
+above SQLite3 database). Make sure the database has no tables beginning with 
 `test`, as both the test and benchmark suites create tables to test with and
 will fail otherwise.
 
@@ -89,23 +105,6 @@ to generate):
 
     cabal bench --benchmark-option="-oxxxxxx.html"
 
-
-
-If you want to run the HDBC test suite, then set your DSN to `hdbctest`,
-and set up to connect to a database of your choice, such as an empty file
-in the `hdbc-odbc/testsrc` directory:
-
-    touch hdbc-odbc/testsrc/hdbctest.db
-
-You can check that everything is working appropriately in ghci:
-
-    ghci> :m + Database.HDBC Database.HDBC.ODBC
-    ghci> conn <- connectODBC "DSN=hdbctest"
-    ghci> hdbcDriverName conn
-    "odbc"
-    ghci> hdbcClientVer conn
-    "03.52"
-
 You can then run some tests on your database:
 
     cd testsrc
@@ -114,6 +113,6 @@ You can then run some tests on your database:
 Contributing
 ------------
 
-Contributions are welcome! If you would like to contribute, please fork the the
+Contributions are welcome! If you would like to contribute, please fork the
 [github repository](https://github.com/hdbc/hdbc-odbc), and submit a pull
 request.

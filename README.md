@@ -71,9 +71,25 @@ This should return:
     [SQLite]
     [SQLite3]
 
-Next, fire up the `ODBCConfig` too to set up a new DSN:
+Next, fire up the `ODBCConfig` tool to set up a new DSN:
 
     ODBCConfig
+
+If you want to run the HDBC-ODBC test or benchmarking suites, then set/create a
+DSN with name "HDBC-test". Make sure the database has no tables beginning with 
+`test`, as both the test and benchmark suites create tables to test with and
+will fail otherwise.
+
+To run the test suite (with live results):
+
+    cabal test --show-details=streaming
+
+To run the benchmark suite (replacing xxxxxx with the name of the report file
+to generate):
+
+    cabal bench --benchmark-option="-oxxxxxx.html"
+
+
 
 If you want to run the HDBC test suite, then set your DSN to `hdbctest`,
 and set up to connect to a database of your choice, such as an empty file

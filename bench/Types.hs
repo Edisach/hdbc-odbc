@@ -5,6 +5,9 @@ import Database.HDBC
 import Database.HDBC.SqlValue
 import Data.ByteString.Char8(pack)
 import qualified Data.ByteString as B
+import Data.Word
+import Data.Int
+import Data.Ratio
 
 -- Benchmark group
 benchTypes conn = bgroup "Types" 
@@ -19,6 +22,14 @@ benchTypes conn = bgroup "Types"
              , benchInsertByteStringLong conn
              , benchInsertStringFile conn
              , benchInsertByteStringFile conn
+             , benchInsertWord32 conn
+             , benchInsertWord64 conn
+             , benchInsertInt64 conn
+             , benchInsertInteger conn
+             , benchInsertChar conn
+             , benchInsertBool conn
+             , benchInsertDouble conn
+             , benchInsertRational conn
              ]
 
 -- Utilities
@@ -72,4 +83,49 @@ benchInsertByteStringFile conn = bench "insertByteStringFile" $ nfIO $ do
   stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
   str <- B.readFile "text"
   execute stmt [SqlByteString str]
+  commit conn
+
+benchInsertWord32 conn = bench "insertWord32" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlWord32 ((fromIntegral 97) :: Word32)]
+  commit conn
+
+benchInsertWord64 conn = bench "insertWord64" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlWord64 ((fromIntegral 98) :: Word64)]
+  commit conn
+
+benchInsertInt32 conn = bench "insertInt32" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlInt32 ((fromIntegral 1) :: Int32)]
+  commit conn
+
+benchInsertInt64 conn = bench "insertInt64" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlInt64 ((fromIntegral 2) :: Int64)]
+  commit conn
+
+benchInsertInteger conn = bench "insertInteger" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlInteger (fromIntegral 3)]
+  commit conn
+
+benchInsertChar conn = bench "insertChar" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlChar 'a']
+  commit conn
+
+benchInsertBool conn = bench "insertBool" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlBool True]
+  commit conn
+
+benchInsertDouble conn = bench "insertDouble" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlDouble 1.0]
+  commit conn
+
+benchInsertRational conn = bench "insertRational" $ nfIO $ do
+  stmt <- prepare conn "INSERT INTO testTypes VALUES (?)"
+  execute stmt [SqlRational $ 5%3]
   commit conn

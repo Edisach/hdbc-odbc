@@ -32,7 +32,3 @@ main = do
   teardownTypes conn
   disconnect conn
 
-
-
-
-

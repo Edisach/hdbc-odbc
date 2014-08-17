@@ -6,16 +6,17 @@ import Control.Monad (forM, mapM, mapM_)
 
 -- The benchmark group
 benchBasic conn n = bgroup "Basic"
-              [ benchSelectExecute1 conn
-              , benchSelectRun1 conn
+              [ benchSelectRun1 conn
+              , benchSelectExecute1 conn
+              , benchSelectExecute conn n
+              , benchSelectExecuteMany conn n
               , benchQuickQuery conn
               , benchQuickQuery' conn
+              , benchInsertRun conn
+              , benchInsertRunBind conn
               , benchPrepare conn
               , benchPrepareBind conn
               , benchSelectExecute conn n
-              , benchSelectExecuteMany conn n
-              , benchInsertRun conn
-              , benchInsertRunBind conn
               , benchInsertExecute conn
               , benchInsertExecuteBind conn
               , benchInsertExecuteMany conn

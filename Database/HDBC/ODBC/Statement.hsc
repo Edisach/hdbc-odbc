@@ -243,18 +243,18 @@ fexecdirect conn stmt args =
   withConn conn $ \cconn ->
   B.useAsCStringLen (BUTF8.fromString stmt) $ \(cquery, cqlen) ->
   alloca $ \(psthptr::Ptr (Ptr CStmt)) ->
-    do l $ "in fexecdirect: " ++ show stmt ++ show args
+    do n $ "in fexecdirect: " ++ show stmt ++ " " ++ show args
        rc <- sqlAllocStmtHandle #{const SQL_HANDLE_STMT} cconn psthptr
+       n $ "r is " ++ show rc
        sthptr <- peek psthptr
-       l $ "sthptr is " ++ show sthptr
-       l $ "r is " ++ show rc
+       n $ "sthptr is " ++ show sthptr
        checkError "execDirect allocHandle" (DbcHandle cconn) rc
 
        bindArgs <- zipWithM (bindParam sthptr) args [1..]
-       l $ "Ready for sqlExecDirect" 
+       n $ "Ready for sqlExecDirect" 
        r <- sqlExecDirect sthptr cquery (fromIntegral cqlen)
 
-       l $ "r: " ++ show r
+       n $ "r: " ++ show r
        mapM_ (\(x,y) -> free x >> free y) (catMaybes bindArgs)
 
        case r of
@@ -262,7 +262,7 @@ fexecdirect conn stmt args =
          x -> checkError "execDirect" (StmtHandle sthptr) x
        
        rcols <- getNumResultCols sthptr
-       l $ "rcols: " ++ show rcols
+       n $ "rcols: " ++ show rcols
 
        case rcols of 
          0 -> do rowcount <- getSqlRowCount sthptr

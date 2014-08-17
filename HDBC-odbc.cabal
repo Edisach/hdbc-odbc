@@ -138,7 +138,6 @@ benchmark hdbc-bench
     ForeignFunctionInterface,
     ScopedTypeVariables
   GHC-Options: -O2
-  C-Sources: hdbc-odbc-helper.c
   build-depends: 	base, criterion
   C-Sources: 		hdbc-odbc-helper.c
   if os(mingw32) || os(win32)
@@ -146,9 +145,3 @@ benchmark hdbc-bench
   else
     Extra-Libraries: odbc
   include-dirs: .
-  ghc-options: 		-O2
-  Extensions: 
-    ExistentialQuantification,
-    ForeignFunctionInterface,
-    ScopedTypeVariables
-  include-dirs: 	.
